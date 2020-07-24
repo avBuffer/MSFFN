@@ -8,7 +8,7 @@ Download KAIST Multispectral Pedestrian Detection Benchmark [[KAIST](http://mult
 Extract all of these tars into one directory and rename them, which should have the following basic structure.
 ```
 
-###Path: data/dataset/kaist
+### Kaist datasets path
 
 1) data/dataset/kaist/annos
 
@@ -28,7 +28,7 @@ Extract all of these tars into one directory and rename them, which should have 
 
 ```bashrc
 
-	$ python scripts/annotation.py
+$ python scripts/annotation.py
 
 Then edit your `core/config.py` to make some necessary configurations
 ```
