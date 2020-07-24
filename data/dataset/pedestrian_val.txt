@@ -1,0 +1,1 @@
+data/dataset/kaist/images/visible/set00_V008_I00627.jpg data/dataset/kaist/images/lwir/set00_V008_I00627.jpg 385,228,408,285,0
