@@ -60,15 +60,23 @@ Two files are required as follows:
 	data/dataset/kaist/images/visible/set00_V008_I00627.jpg data/dataset/kaist/images/lwir/set00_V008_I00627.jpg 385,228,408,285,0
 	```
 
-### Train method:
+### Train method
 
 ```bashrc
 $ python train.py
 $ tensorboard --logdir data/log/train
 ```
 
-### Evaluate method:
+### Evaluate method
 
 ```bashrc
 $ python evaluate.py
+```
+
+### mAP
+
+```bashrc
+$ python evaluate.py
+$ cd mAP
+$ python main.py
 ```
