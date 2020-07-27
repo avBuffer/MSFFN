@@ -72,7 +72,7 @@ class YoloTrain(object):
         with tf.name_scope('learn_rate'):
             self.global_step = tf.Variable(1.0, dtype=tf.float64, trainable=False, name='global_step')
             warmup_steps = tf.constant(self.warmup_periods * self.steps_per_period, dtype=tf.float64, name='warmup_steps')
-            train_steps = tf.constant( (self.first_stage_epochs + self.second_stage_epochs)* self.steps_per_period, dtype=tf.float64, name='train_steps')
+            train_steps = tf.constant((self.first_stage_epochs + self.second_stage_epochs) * self.steps_per_period, dtype=tf.float64, name='train_steps')
             
             self.learn_rate = tf.cond(pred=self.global_step < warmup_steps,
                                       true_fn=lambda: self.global_step / warmup_steps * self.learn_rate_init,
@@ -111,14 +111,14 @@ class YoloTrain(object):
         
         with tf.name_scope('loader_and_saver'):
             self.loader = tf.train.Saver(self.net_var)
-            self.saver  = tf.train.Saver(tf.global_variables(), max_to_keep=10)
+            self.saver  = tf.train.Saver(tf.global_variables(), max_to_keep=10000)
 
         
         with tf.name_scope('summary'):
-            tf.summary.scalar("learn_rate",      self.learn_rate)
-            tf.summary.scalar("giou_loss",  self.giou_loss)
-            tf.summary.scalar("conf_loss",  self.conf_loss)
-            tf.summary.scalar("prob_loss",  self.prob_loss)
+            tf.summary.scalar("learn_rate", self.learn_rate)
+            tf.summary.scalar("giou_loss", self.giou_loss)
+            tf.summary.scalar("conf_loss", self.conf_loss)
+            tf.summary.scalar("prob_loss", self.prob_loss)
             tf.summary.scalar("total_loss", self.loss)
 
             self.write_op = tf.summary.merge_all()
@@ -168,7 +168,7 @@ class YoloTrain(object):
             log_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
             
             print("=> Epoch: %2d Time: %s Train loss: %.4f Test loss: %.4f Saving %s ..." % 
-                (epoch, log_time, train_epoch_loss, test_epoch_loss, ckpt_file))
+                 (epoch, log_time, train_epoch_loss, test_epoch_loss, ckpt_file))
             self.saver.save(self.sess, ckpt_file, global_step=epoch)
 
 

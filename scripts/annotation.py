@@ -55,7 +55,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_path", default="data/dataset/kaist")
     parser.add_argument("--train_annotation", default="data/dataset/pedestrian_train.txt")
-    parser.add_argument("--val_annotation",  default="data/dataset/pedestrian_val.txt")
+    parser.add_argument("--val_annotation", default="data/dataset/pedestrian_val.txt")
     flags = parser.parse_args()
 
     if os.path.exists(flags.train_annotation):
@@ -66,4 +66,4 @@ if __name__ == '__main__':
 
     train_num = convert_annotation(flags.data_path, 'train', flags.train_annotation)
     val_num = convert_annotation(flags.data_path, 'val', flags.val_annotation)
-    print('=> The number of image for train is: %d\tThe number of image for test is:%d' % (train_num, val_num))
+    print('=> The number of image for train is: %d\tThe number of image for val is:%d' % (train_num, val_num))

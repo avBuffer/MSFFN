@@ -27,7 +27,6 @@ Extract all of these tars into one directory and rename them, which should have 
 ### Make kaist train and val annotation
 
 ```bashrc
-
 $ python scripts/annotation.py
 
 Then edit your `core/config.py` to make some necessary configurations

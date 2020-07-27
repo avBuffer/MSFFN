@@ -29,7 +29,7 @@ def convolutional(input_data, filters_shape, trainable, name, downsample=False, 
                                    initializer=tf.constant_initializer(0.0))
             conv = tf.nn.bias_add(conv, bias)
 
-        if activate == True: 
+        if activate == True:
             conv = tf.nn.leaky_relu(conv, alpha=0.1)
     return conv
 
@@ -39,7 +39,7 @@ def residual_block(input_data, input_channel, filter_num1, filter_num2, trainabl
     with tf.variable_scope(name):
         input_data = convolutional(input_data, filters_shape=(1, 1, input_channel, filter_num1),
                                    trainable=trainable, name='conv1')
-        input_data = convolutional(input_data, filters_shape=(3, 3, filter_num1,   filter_num2),
+        input_data = convolutional(input_data, filters_shape=(3, 3, filter_num1, filter_num2),
                                    trainable=trainable, name='conv2')
         residual_output = input_data + short_cut
     return residual_output
@@ -61,6 +61,6 @@ def upsample(input_data, name, method="deconv"):
     if method == "deconv":
         # replace resize_nearest_neighbor with conv2d_transpose To support TensorRT optimization
         numm_filter = input_data.shape.as_list()[-1]
-        output = tf.layers.conv2d_transpose(input_data, numm_filter, kernel_size=2, padding='same', strides=(2, 2), 
+        output = tf.layers.conv2d_transpose(input_data, numm_filter, kernel_size=2, padding='same', strides=(2, 2),
                                             kernel_initializer=tf.random_normal_initializer())
     return output

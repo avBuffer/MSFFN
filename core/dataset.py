@@ -107,7 +107,7 @@ class Dataset(object):
     def random_crop(self, image, lwir_image, bboxes):
         if random.random() < 0.5:
             h, w, _ = image.shape
-            max_bbox = np.concatenate([np.min(bboxes[:, 0:2], axis=0), 
+            max_bbox = np.concatenate([np.min(bboxes[:, 0:2], axis=0),
                                        np.max(bboxes[:, 2:4], axis=0)], axis=-1)
 
             max_l_trans = max_bbox[0]
@@ -171,7 +171,7 @@ class Dataset(object):
             image, lwir_image, bboxes = self.random_translate(np.copy(image), np.copy(lwir_image), np.copy(bboxes))
 
         image, bboxes = utils.image_preporcess(np.copy(image), [self.train_input_size, self.train_input_size], np.copy(bboxes))
-        lwir_image = utils.image_preporcess(np.copy(lwir_image), [self.train_input_size, self.train_input_size]) 
+        lwir_image = utils.image_preporcess(np.copy(lwir_image), [self.train_input_size, self.train_input_size])
         return image, lwir_image, bboxes
 
 
@@ -198,7 +198,7 @@ class Dataset(object):
 
     def preprocess_true_boxes(self, bboxes):
         label = [np.zeros((self.train_output_sizes[i], self.train_output_sizes[i],
-                           self.anchor_per_scale, 5 + self.num_classes)) for i in range(3)]        
+                           self.anchor_per_scale, 5 + self.num_classes)) for i in range(3)]
         bboxes_xywh = [np.zeros((self.max_bbox_per_scale, 4)) for _ in range(3)]
         bbox_count = np.zeros((3,))
 

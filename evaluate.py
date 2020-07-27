@@ -61,7 +61,7 @@ class YoloTest(object):
         self.saver.restore(self.sess, self.weight_file)
 
 
-    def predict(self, image):
+    def predict(self, image, lwir_image):
         org_image = np.copy(image)
         org_h, org_w, _ = org_image.shape
 
@@ -72,7 +72,7 @@ class YoloTest(object):
         lwir_image_data = lwir_image_data[np.newaxis, ...]
 
         pred_sbbox, pred_mbbox, pred_lbbox = self.sess.run([self.pred_sbbox, self.pred_mbbox, self.pred_lbbox],
-            feed_dict={self.input_data: image_data, self.lwir_image_data: lwir_image_data, self.trainable: False})
+            feed_dict={self.input_data: image_data, self.lwir_input_data: lwir_image_data, self.trainable: False})
 
         pred_bbox = np.concatenate([np.reshape(pred_sbbox, (-1, 5 + self.num_classes)),
                                     np.reshape(pred_mbbox, (-1, 5 + self.num_classes)),
@@ -102,10 +102,10 @@ class YoloTest(object):
                     bboxes_gt, classes_gt = bbox_data_gt[:, :4], bbox_data_gt[:, 4]
                 
                 ground_truth_file = os.path.join(self.ground_truth_path, image_name.replace('.jpg', '.txt'))
-                print('=> ground truth of %s:' % image_name, 'ground_truth_file %s' % ground_truth_file, 
-                      'bbox_data_gt.len %d' % len(bbox_data_gt))
-
                 num_bbox_gt = len(bboxes_gt)
+                print('=> ground truth of %s' % image_name, 'ground_truth_file %s' % ground_truth_file, 
+                      'bbox_gt.len %d' % num_bbox_gt)
+                
                 with open(ground_truth_file, 'w') as f:
                     for i in range(num_bbox_gt):
                         class_name = self.classes[classes_gt[i]]
@@ -116,7 +116,7 @@ class YoloTest(object):
                 
                 predict_result_file = os.path.join(self.predicted_path, image_name.replace('.jpg', '.txt'))
                 bboxes_pr = self.predict(image)
-                print('=> predict result of %s:' % image_name  'predict_result_file %s' % predict_result_file, 
+                print('=> predict result of %s:' % image_name, 'predict_result_file %s' % predict_result_file, 
                       'bboxes_pr.len %d' % len(bboxes_pr))
 
                 if self.write_image:

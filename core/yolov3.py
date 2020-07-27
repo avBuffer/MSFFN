@@ -19,8 +19,8 @@ class YOLOV3(object):
         self.iou_loss_thresh = cfg.YOLO.IOU_LOSS_THRESH
         self.upsample_method = cfg.YOLO.UPSAMPLE_METHOD
 
-        self.fuison_method = cfg.YOLO.FUSION_METHOD
-        assert self.fuison_method in ["add", "concat"]
+        self.fusion_method = cfg.YOLO.FUSION_METHOD
+        assert self.fusion_method in ["add", "concat"]
 
         try:
             self.conv_lbbox, self.conv_mbbox, self.conv_sbbox = self.__build_nework(input_data, lwir_input_data)
@@ -55,7 +55,7 @@ class YOLOV3(object):
         lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 1024, 512), self.trainable, 'lwir_conv56')
         lwir_conv_lobj_branch = common.convolutional(lwir_input_data, (3, 3, 512, 1024), self.trainable, name='lwir_conv_lobj_branch')
 
-        if self.fuison_method == 'add':
+        if self.fusion_method == 'add':
             size_scale = 1
             fusion_conv_lobj_branch = conv_lobj_branch + lwir_conv_lobj_branch
         else:
@@ -63,10 +63,10 @@ class YOLOV3(object):
             with tf.variable_scope('fusion_1'):
                 fusion_conv_lobj_branch = tf.concat([conv_lobj_branch, lwir_conv_lobj_branch], axis=-1)
 
-        conv_lbbox = common.convolutional(fusion_conv_lobj_branch, (1, 1, 1024 * size_scale, 3 * (self.num_class + 5)), trainable=self.trainable, 
+        conv_lbbox = common.convolutional(fusion_conv_lobj_branch, (1, 1, 1024 * size_scale, 3 * (self.num_class + 5)), trainable=self.trainable,
                                           name='conv_lbbox', activate=False, bn=False)
 
-        
+
         # for middle object
         input_data = common.convolutional(input_data, (1, 1, 512, 256), self.trainable, 'conv57')
         input_data = common.upsample(input_data, name='upsample0', method=self.upsample_method)
@@ -95,7 +95,7 @@ class YOLOV3(object):
         lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 512, 256), self.trainable, 'lwir_conv62')
         lwir_conv_mobj_branch = common.convolutional(lwir_input_data, (3, 3, 256, 512), self.trainable, name='lwir_conv_mobj_branch')        
         
-        if self.fuison_method == 'add':
+        if self.fusion_method == 'add':
             size_scale = 1
             fusion_conv_mobj_branch = conv_mobj_branch + lwir_conv_mobj_branch
         else:
@@ -135,7 +135,7 @@ class YOLOV3(object):
         lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 256, 128), self.trainable, 'lwir_conv68')
         lwir_conv_sobj_branch = common.convolutional(lwir_input_data, (3, 3, 128, 256), self.trainable, name='lwir_conv_sobj_branch')
 
-        if self.fuison_method == 'add':
+        if self.fusion_method == 'add':
             size_scale = 1
             fusion_conv_sobj_branch = conv_sobj_branch + lwir_conv_sobj_branch
         else:
@@ -247,18 +247,18 @@ class YOLOV3(object):
         conv_raw_conf = conv[:, :, :, :, 4:5]
         conv_raw_prob = conv[:, :, :, :, 5:]
 
-        pred_xywh     = pred[:, :, :, :, 0:4]
-        pred_conf     = pred[:, :, :, :, 4:5]
+        pred_xywh = pred[:, :, :, :, 0:4]
+        pred_conf = pred[:, :, :, :, 4:5]
 
-        label_xywh    = label[:, :, :, :, 0:4]
-        respond_bbox  = label[:, :, :, :, 4:5]
-        label_prob    = label[:, :, :, :, 5:]
+        label_xywh = label[:, :, :, :, 0:4]
+        respond_bbox = label[:, :, :, :, 4:5]
+        label_prob = label[:, :, :, :, 5:]
 
         giou = tf.expand_dims(self.bbox_giou(pred_xywh, label_xywh), axis=-1)
         input_size = tf.cast(input_size, tf.float32)
 
         bbox_loss_scale = 2.0 - 1.0 * label_xywh[:, :, :, :, 2:3] * label_xywh[:, :, :, :, 3:4] / (input_size ** 2)
-        giou_loss = respond_bbox * bbox_loss_scale * (1- giou)
+        giou_loss = respond_bbox * bbox_loss_scale * (1 - giou)
 
         iou = self.bbox_iou(pred_xywh[:, :, :, :, np.newaxis, :], bboxes[:, np.newaxis, np.newaxis, np.newaxis, :, :])
         max_iou = tf.expand_dims(tf.reduce_max(iou, axis=-1), axis=-1)
@@ -279,13 +279,13 @@ class YOLOV3(object):
     def compute_loss(self, label_sbbox, label_mbbox, label_lbbox, true_sbbox, true_mbbox, true_lbbox):
         with tf.name_scope('smaller_box_loss'):
             loss_sbbox = self.loss_layer(self.conv_sbbox, self.pred_sbbox, label_sbbox, true_sbbox,
-                                         anchors = self.anchors[0], stride = self.strides[0])
+                                         anchors=self.anchors[0], stride=self.strides[0])
         with tf.name_scope('medium_box_loss'):
             loss_mbbox = self.loss_layer(self.conv_mbbox, self.pred_mbbox, label_mbbox, true_mbbox,
-                                         anchors = self.anchors[1], stride = self.strides[1])
+                                         anchors=self.anchors[1], stride=self.strides[1])
         with tf.name_scope('bigger_box_loss'):
             loss_lbbox = self.loss_layer(self.conv_lbbox, self.pred_lbbox, label_lbbox, true_lbbox,
-                                         anchors = self.anchors[2], stride = self.strides[2])
+                                         anchors=self.anchors[2], stride=self.strides[2])
 
         with tf.name_scope('giou_loss'):
             giou_loss = loss_sbbox[0] + loss_mbbox[0] + loss_lbbox[0]

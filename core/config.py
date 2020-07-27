@@ -55,8 +55,8 @@ __C.TEST.WEIGHT_FILE = "ckpts/Pedestrian_yolov3_loss-99.2099_162.8037.ckpt-8"
 __C.TEST.SCORE_THRESHOLD = 0.3
 __C.TEST.IOU_THRESHOLD = 0.45
 
-__C.TEST.PREDICTED_PATH = "mAP/predicted/"
 __C.TEST.GROUND_TRUTH_PATH = "mAP/ground-truth/"
+__C.TEST.PREDICTED_PATH = "mAP/predicted/"
 
 __C.TEST.WRITE_IMAGE = True
 __C.TEST.WRITE_IMAGE_PATH = "mAP/detection/"

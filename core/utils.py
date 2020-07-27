@@ -30,7 +30,7 @@ def image_preporcess(image, target_size, gt_boxes=None):
     h,  w, _ = image.shape
 
     scale = min(iw / w, ih / h)
-    nw, nh  = int(scale * w), int(scale * h)
+    nw, nh = int(scale * w), int(scale * h)
     image_resized = cv2.resize(image, (nw, nh))
 
     image_paded = np.full(shape=[ih, iw, 3], fill_value=128.0)
