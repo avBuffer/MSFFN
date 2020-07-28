@@ -1,5 +1,5 @@
 # MSFFN
-Multi-Spectral Feature Fusion Network for object detection or pedestrian detection based on KAIST Multispectral Pedestrian Detection Benchmark
+MultiSpectral Feature Fusion Network for object detection or pedestrian detection based on KAIST Multispectral Pedestrian Detection Benchmark
 
 ## Download KAIST dataset
 Download KAIST Multispectral Pedestrian Detection Benchmark [[KAIST](http://multispectral.kaist.ac.kr)]
