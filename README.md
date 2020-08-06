@@ -83,7 +83,9 @@ $ python main.py
 
 ### Demo
 Two steps:
+
 Step1: freeze graph from ckpt file into pb file in order to speed up
+
 Step2: config pb_file and images or videos file, or num_classes / input_size / score_thresh / iou_thresh in demo.py
 
 ```bashrc
