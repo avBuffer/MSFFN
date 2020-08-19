@@ -227,7 +227,9 @@ class Dataset(object):
                 iou_mask = iou_scale > 0.3
 
                 if np.any(iou_mask):
-                    xind, yind = np.floor(bbox_xywh_scaled[i, 0:2]).astype(np.int32)
+                    xind0, yind0 = np.floor(bbox_xywh_scaled[i, 0:2]).astype(np.int32)
+                    xind = xind0 if xind0 < label[i].shape[0] else label[i].shape[0] - 1
+                    yind = yind0 if yind0 < label[i].shape[1] else label[i].shape[1] - 1
 
                     label[i][yind, xind, iou_mask, :] = 0
                     label[i][yind, xind, iou_mask, 0:4] = bbox_xywh

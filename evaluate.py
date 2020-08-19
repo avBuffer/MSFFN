@@ -96,8 +96,8 @@ class YoloTest(object):
 
                 bbox_data_gt = np.array([list(map(int, box.split(','))) for box in annotation[2:]])
                 if len(bbox_data_gt) == 0:
-                    bboxes_gt=[]
-                    classes_gt=[]
+                    bboxes_gt = []
+                    classes_gt = []
                 else:
                     bboxes_gt, classes_gt = bbox_data_gt[:, :4], bbox_data_gt[:, 4]
                 

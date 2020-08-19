@@ -40,7 +40,6 @@ def image_preporcess(image, target_size, gt_boxes=None):
 
     if gt_boxes is None:
         return image_paded
-
     else:
         gt_boxes[:, [0, 2]] = gt_boxes[:, [0, 2]] * scale + dw
         gt_boxes[:, [1, 3]] = gt_boxes[:, [1, 3]] * scale + dh
@@ -48,7 +47,7 @@ def image_preporcess(image, target_size, gt_boxes=None):
 
 
 def draw_bbox(image, bboxes, classes=read_class_names(cfg.YOLO.CLASSES), show_label=True):
-    """bboxes: [x_min, y_min, x_max, y_max, probability, cls_id] format coordinates"""
+    #bboxes: [x_min, y_min, x_max, y_max, probability, cls_id] format coordinates
     num_classes = len(classes)
     image_h, image_w, _ = image.shape
 
@@ -96,8 +95,8 @@ def bboxes_iou(boxes1, boxes2):
     inter_area = inter_section[..., 0] * inter_section[..., 1]
     union_area = boxes1_area + boxes2_area - inter_area
 
-    ious = np.maximum(1.0 * inter_area / union_area, np.finfo(np.float32).eps)
-    return ious
+    iou = np.maximum(1.0 * inter_area / union_area, np.finfo(np.float32).eps)
+    return iou
 
 
 def read_pb_return_tensors(graph, pb_file, return_elements):
@@ -112,8 +111,7 @@ def read_pb_return_tensors(graph, pb_file, return_elements):
 
 def nms(bboxes, iou_threshold, sigma=0.3, method='nms'):
     """param bboxes: (xmin, ymin, xmax, ymax, score, class)
-    Note: soft-nms, https://arxiv.org/pdf/1704.04503.pdf
-          https://github.com/bharatsingh430/soft-nms"""
+    Note: soft-nms, https://arxiv.org/pdf/1704.04503.pdf, https://github.com/bharatsingh430/soft-nms"""
     classes_in_img = list(set(bboxes[:, 5]))
     best_bboxes = []
 
@@ -155,7 +153,7 @@ def postprocess_boxes(pred_bbox, org_img_shape, input_size, score_threshold):
     # (1) (x, y, w, h) --> (xmin, ymin, xmax, ymax)
     pred_coor = np.concatenate([pred_xywh[:, :2] - pred_xywh[:, 2:] * 0.5,
                                 pred_xywh[:, :2] + pred_xywh[:, 2:] * 0.5], axis=-1)
-    
+
     # (2) (xmin, ymin, xmax, ymax) -> (xmin_org, ymin_org, xmax_org, ymax_org)
     org_h, org_w = org_img_shape
     resize_ratio = min(input_size / org_w, input_size / org_h)

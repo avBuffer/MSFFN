@@ -12,6 +12,7 @@ cfg = __C
 __C.YOLO = edict()
 
 # Set the class name
+__C.YOLO.NET_TYPE = 'mobilenetv2' # 'darknet53' 'mobilenetv2'
 __C.YOLO.CLASSES = "data/classes/pedestrian.names"
 __C.YOLO.ANCHORS = "data/anchors/basline_anchors.txt"
 
@@ -27,13 +28,13 @@ __C.YOLO.FUSION_METHOD = "add"
 # Train options
 __C.TRAIN = edict()
 
-__C.TRAIN.ANNOT_PATH = "data/dataset/Pedestrian_train.txt"
-__C.TRAIN.BATCH_SIZE = 3
+__C.TRAIN.ANNOT_PATH = "D:/datasets/Pedestrians/pedestrian_train.txt"
+__C.TRAIN.BATCH_SIZE = 4
 __C.TRAIN.INPUT_SIZE = [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
 __C.TRAIN.DATA_AUG = False
 
 __C.TRAIN.LEARN_RATE_INIT = 1e-4
-__C.TRAIN.LEARN_RATE_END = 1e-6
+__C.TRAIN.LEARN_RATE_END = 1e-8
 __C.TRAIN.WARMUP_EPOCHS = 5
 
 __C.TRAIN.FISRT_STAGE_EPOCHS = 20
@@ -46,7 +47,7 @@ __C.TRAIN.CKPT_PATH = "ckpts"
 # TEST options
 __C.TEST = edict()
 
-__C.TEST.ANNOT_PATH = "data/dataset/Pedestrian_val.txt"
+__C.TEST.ANNOT_PATH = "D:/datasets/Pedestrians/pedestrian_val.txt"
 __C.TEST.BATCH_SIZE = 1
 __C.TEST.INPUT_SIZE = 416
 __C.TEST.DATA_AUG = False

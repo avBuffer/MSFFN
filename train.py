@@ -4,14 +4,27 @@ import os
 import time
 import shutil
 import numpy as np
-import tensorflow as tf
 import core.utils as utils
 from tqdm import tqdm
 from core.dataset import Dataset
 from core.yolov3 import YOLOV3
 from core.config import cfg
 
+import tensorflow
+print('tensorflow.version=', tensorflow.__version__)
+if tensorflow.__version__.startswith('1.'):
+    import tensorflow as tf
+else:
+    import tensorflow.compat.v1 as tf
+    tf.disable_v2_behavior()
+
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+"""TF_CPP_MIN_LOG_LEVEL 取值 0 0也是默认值，输出所有信息
+   TF_CPP_MIN_LOG_LEVEL 取值 1 屏蔽通知信息
+   TF_CPP_MIN_LOG_LEVEL 取值 2 屏蔽通知信息和警告信息
+   TF_CPP_MIN_LOG_LEVEL 取值 3 屏蔽通知信息、警告信息和报错信息"""
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
+
 
 class YoloTrain(object):
     def __init__(self):
@@ -44,8 +57,10 @@ class YoloTrain(object):
         self.trainset = Dataset('train')
         self.testset = Dataset('test')
         self.steps_per_period = len(self.trainset)
-        self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
 
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        self.sess = tf.Session(config=config)
 
         with tf.name_scope('define_input'):
             self.input_data = tf.placeholder(dtype=tf.float32, name='input_data')

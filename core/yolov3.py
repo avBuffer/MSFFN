@@ -1,15 +1,24 @@
 #! /usr/bin/env python
 # coding=utf-8
 import numpy as np
-import tensorflow as tf
 import core.utils as utils
 import core.common as common
 import core.backbone as backbone
 from core.config import cfg
 
+import tensorflow
+if tensorflow.__version__.startswith('1.'):
+    import tensorflow as tf
+else:
+    import tensorflow.compat.v1 as tf
+    tf.disable_v2_behavior()
+
 
 class YOLOV3(object):
     def __init__(self, input_data, lwir_input_data, trainable):
+        self.net_type = cfg.YOLO.NET_TYPE
+        print('YOLOV3 net_type=', self.net_type)
+
         self.trainable = trainable
         self.classes = utils.read_class_names(cfg.YOLO.CLASSES)
         self.num_class = len(self.classes)
@@ -36,117 +45,211 @@ class YOLOV3(object):
 
 
     def __build_nework(self, input_data, lwir_input_data):
-        route_1, route_2, input_data = backbone.darknet53(input_data, self.trainable, name='darknet')
-        lwir_route_1, lwir_route_2, lwir_input_data = backbone.darknet53(lwir_input_data, self.trainable, name='lwir_darknet')
+        assert self.net_type in ['darknet53', 'mobilenetv2']
 
-        # for large object
-        input_data = common.convolutional(input_data, (1, 1, 1024, 512), self.trainable, 'conv52')
-        input_data = common.convolutional(input_data, (3, 3, 512, 1024), self.trainable, 'conv53')
-        input_data = common.convolutional(input_data, (1, 1, 1024, 512), self.trainable, 'conv54')
-        input_data = common.convolutional(input_data, (3, 3, 512, 1024), self.trainable, 'conv55')
-        input_data = common.convolutional(input_data, (1, 1, 1024, 512), self.trainable, 'conv56')
-        conv_lobj_branch = common.convolutional(input_data, (3, 3, 512, 1024), self.trainable, name='conv_lobj_branch')
+        if self.net_type == 'darknet53':
+            route_1, route_2, input_data = backbone.darknet53(input_data, self.trainable, name='darknet')
+            lwir_route_1, lwir_route_2, lwir_input_data = backbone.darknet53(lwir_input_data, self.trainable, name='lwir_darknet')
 
+            # for large object
+            input_data = common.convolutional(input_data, (1, 1, 1024, 512), self.trainable, 'conv52')
+            input_data = common.convolutional(input_data, (3, 3, 512, 1024), self.trainable, 'conv53')
+            input_data = common.convolutional(input_data, (1, 1, 1024, 512), self.trainable, 'conv54')
+            input_data = common.convolutional(input_data, (3, 3, 512, 1024), self.trainable, 'conv55')
+            input_data = common.convolutional(input_data, (1, 1, 1024, 512), self.trainable, 'conv56')
+            conv_lobj_branch = common.convolutional(input_data, (3, 3, 512, 1024), self.trainable, name='conv_lobj_branch')
 
-        lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 1024, 512), self.trainable, 'lwir_conv52')
-        lwir_input_data = common.convolutional(lwir_input_data, (3, 3, 512, 1024), self.trainable, 'lwir_conv53')
-        lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 1024, 512), self.trainable, 'lwir_conv54')
-        lwir_input_data = common.convolutional(lwir_input_data, (3, 3, 512, 1024), self.trainable, 'lwir_conv55')
-        lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 1024, 512), self.trainable, 'lwir_conv56')
-        lwir_conv_lobj_branch = common.convolutional(lwir_input_data, (3, 3, 512, 1024), self.trainable, name='lwir_conv_lobj_branch')
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 1024, 512), self.trainable, 'lwir_conv52')
+            lwir_input_data = common.convolutional(lwir_input_data, (3, 3, 512, 1024), self.trainable, 'lwir_conv53')
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 1024, 512), self.trainable, 'lwir_conv54')
+            lwir_input_data = common.convolutional(lwir_input_data, (3, 3, 512, 1024), self.trainable, 'lwir_conv55')
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 1024, 512), self.trainable, 'lwir_conv56')
+            lwir_conv_lobj_branch = common.convolutional(lwir_input_data, (3, 3, 512, 1024), self.trainable, name='lwir_conv_lobj_branch')
 
-        if self.fusion_method == 'add':
-            size_scale = 1
-            fusion_conv_lobj_branch = conv_lobj_branch + lwir_conv_lobj_branch
-        else:
-            size_scale = 2
-            with tf.variable_scope('fusion_1'):
-                fusion_conv_lobj_branch = tf.concat([conv_lobj_branch, lwir_conv_lobj_branch], axis=-1)
+            if self.fusion_method == 'add':
+                size_scale = 1
+                fusion_conv_lobj_branch = conv_lobj_branch + lwir_conv_lobj_branch
+            else:
+                size_scale = 2
+                with tf.variable_scope('fusion_1'):
+                    fusion_conv_lobj_branch = tf.concat([conv_lobj_branch, lwir_conv_lobj_branch], axis=-1)
 
-        conv_lbbox = common.convolutional(fusion_conv_lobj_branch, (1, 1, 1024 * size_scale, 3 * (self.num_class + 5)), trainable=self.trainable,
-                                          name='conv_lbbox', activate=False, bn=False)
-
-
-        # for middle object
-        input_data = common.convolutional(input_data, (1, 1, 512, 256), self.trainable, 'conv57')
-        input_data = common.upsample(input_data, name='upsample0', method=self.upsample_method)
-
-        with tf.variable_scope('route_1'):
-            input_data = tf.concat([input_data, route_2], axis=-1)
-
-        input_data = common.convolutional(input_data, (1, 1, 768, 256), self.trainable, 'conv58')
-        input_data = common.convolutional(input_data, (3, 3, 256, 512), self.trainable, 'conv59')
-        input_data = common.convolutional(input_data, (1, 1, 512, 256), self.trainable, 'conv60')
-        input_data = common.convolutional(input_data, (3, 3, 256, 512), self.trainable, 'conv61')
-        input_data = common.convolutional(input_data, (1, 1, 512, 256), self.trainable, 'conv62')
-        conv_mobj_branch = common.convolutional(input_data, (3, 3, 256, 512), self.trainable, name='conv_mobj_branch')
+            conv_lbbox = common.convolutional(fusion_conv_lobj_branch, (1, 1, 1024 * size_scale, 3 * (self.num_class + 5)), trainable=self.trainable,
+                                              name='conv_lbbox', activate=False, bn=False)
 
 
-        lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 512, 256), self.trainable, 'lwir_conv57')
-        lwir_input_data = common.upsample(lwir_input_data, name='lwir_upsample0', method=self.upsample_method)
+            # for middle object
+            input_data = common.convolutional(input_data, (1, 1, 512, 256), self.trainable, 'conv57')
+            input_data = common.upsample(input_data, name='upsample0', method=self.upsample_method)
 
-        with tf.variable_scope('lwir_route_1'):
-            lwir_input_data = tf.concat([lwir_input_data, lwir_route_2], axis=-1)
+            with tf.variable_scope('route_1'):
+                input_data = tf.concat([input_data, route_2], axis=-1)
 
-        lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 768, 256), self.trainable, 'lwir_conv58')
-        lwir_input_data = common.convolutional(lwir_input_data, (3, 3, 256, 512), self.trainable, 'lwir_conv59')
-        lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 512, 256), self.trainable, 'lwir_conv60')
-        lwir_input_data = common.convolutional(lwir_input_data, (3, 3, 256, 512), self.trainable, 'lwir_conv61')
-        lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 512, 256), self.trainable, 'lwir_conv62')
-        lwir_conv_mobj_branch = common.convolutional(lwir_input_data, (3, 3, 256, 512), self.trainable, name='lwir_conv_mobj_branch')        
+            input_data = common.convolutional(input_data, (1, 1, 768, 256), self.trainable, 'conv58')
+            input_data = common.convolutional(input_data, (3, 3, 256, 512), self.trainable, 'conv59')
+            input_data = common.convolutional(input_data, (1, 1, 512, 256), self.trainable, 'conv60')
+            input_data = common.convolutional(input_data, (3, 3, 256, 512), self.trainable, 'conv61')
+            input_data = common.convolutional(input_data, (1, 1, 512, 256), self.trainable, 'conv62')
+            conv_mobj_branch = common.convolutional(input_data, (3, 3, 256, 512), self.trainable, name='conv_mobj_branch')
+
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 512, 256), self.trainable, 'lwir_conv57')
+            lwir_input_data = common.upsample(lwir_input_data, name='lwir_upsample0', method=self.upsample_method)
+            with tf.variable_scope('lwir_route_1'):
+                lwir_input_data = tf.concat([lwir_input_data, lwir_route_2], axis=-1)
+
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 768, 256), self.trainable, 'lwir_conv58')
+            lwir_input_data = common.convolutional(lwir_input_data, (3, 3, 256, 512), self.trainable, 'lwir_conv59')
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 512, 256), self.trainable, 'lwir_conv60')
+            lwir_input_data = common.convolutional(lwir_input_data, (3, 3, 256, 512), self.trainable, 'lwir_conv61')
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 512, 256), self.trainable, 'lwir_conv62')
+            lwir_conv_mobj_branch = common.convolutional(lwir_input_data, (3, 3, 256, 512), self.trainable, name='lwir_conv_mobj_branch')
+
+            if self.fusion_method == 'add':
+                size_scale = 1
+                fusion_conv_mobj_branch = conv_mobj_branch + lwir_conv_mobj_branch
+            else:
+                size_scale = 2
+                with tf.variable_scope('fusion_2'):
+                    fusion_conv_mobj_branch = tf.concat([conv_mobj_branch, lwir_conv_mobj_branch], axis=-1)
+
+            conv_mbbox = common.convolutional(fusion_conv_mobj_branch, (1, 1, 512 * size_scale, 3 * (self.num_class + 5)), trainable=self.trainable,
+                                              name='conv_mbbox', activate=False, bn=False)
+
+
+            # for small object
+            input_data = common.convolutional(input_data, (1, 1, 256, 128), self.trainable, 'conv63')
+            input_data = common.upsample(input_data, name='upsample1', method=self.upsample_method)
+
+            with tf.variable_scope('route_2'):
+                input_data = tf.concat([input_data, route_1], axis=-1)
+
+            input_data = common.convolutional(input_data, (1, 1, 384, 128), self.trainable, 'conv64')
+            input_data = common.convolutional(input_data, (3, 3, 128, 256), self.trainable, 'conv65')
+            input_data = common.convolutional(input_data, (1, 1, 256, 128), self.trainable, 'conv66')
+            input_data = common.convolutional(input_data, (3, 3, 128, 256), self.trainable, 'conv67')
+            input_data = common.convolutional(input_data, (1, 1, 256, 128), self.trainable, 'conv68')
+            conv_sobj_branch = common.convolutional(input_data, (3, 3, 128, 256), self.trainable, name='conv_sobj_branch')
+
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 256, 128), self.trainable, 'lwir_conv63')
+            lwir_input_data = common.upsample(lwir_input_data, name='lwir_upsample1', method=self.upsample_method)
+            with tf.variable_scope('lwir_route_2'):
+                lwir_input_data = tf.concat([lwir_input_data, lwir_route_1], axis=-1)
+
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 384, 128), self.trainable, 'lwir_conv64')
+            lwir_input_data = common.convolutional(lwir_input_data, (3, 3, 128, 256), self.trainable, 'lwir_conv65')
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 256, 128), self.trainable, 'lwir_conv66')
+            lwir_input_data = common.convolutional(lwir_input_data, (3, 3, 128, 256), self.trainable, 'lwir_conv67')
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 256, 128), self.trainable, 'lwir_conv68')
+            lwir_conv_sobj_branch = common.convolutional(lwir_input_data, (3, 3, 128, 256), self.trainable, name='lwir_conv_sobj_branch')
+
+            if self.fusion_method == 'add':
+                size_scale = 1
+                fusion_conv_sobj_branch = conv_sobj_branch + lwir_conv_sobj_branch
+            else:
+                size_scale = 2
+                with tf.variable_scope('fusion_2'):
+                    fusion_conv_sobj_branch = tf.concat([conv_sobj_branch, lwir_conv_sobj_branch], axis=-1)
+
+            conv_sbbox = common.convolutional(fusion_conv_sobj_branch, (1, 1, 256 * size_scale, 3 * (self.num_class + 5)),
+                                              trainable=self.trainable, name='conv_sbbox', activate=False, bn=False)
+            return conv_lbbox, conv_mbbox, conv_sbbox
+
         
-        if self.fusion_method == 'add':
-            size_scale = 1
-            fusion_conv_mobj_branch = conv_mobj_branch + lwir_conv_mobj_branch
+        elif self.net_type == 'mobilenetv2':
+            route_1, route_2, input_data = backbone.mobilenetv2(input_data, self.trainable, name='darknet')
+            lwir_route_1, lwir_route_2, lwir_input_data = backbone.mobilenetv2(lwir_input_data, self.trainable, name='lwir_darknet')
+
+            # for large object
+            input_data = common.convolutional(input_data, (1, 1, 320, 160), self.trainable, 'conv18')
+            input_data = common.convolutional(input_data, (3, 3, 160, 320), self.trainable, 'conv19')
+            input_data = common.convolutional(input_data, (1, 1, 320, 160), self.trainable, 'conv20')
+            conv_lobj_branch = common.convolutional(input_data, (3, 3, 160, 320), self.trainable, name='conv_lobj_branch')
+
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 320, 160), self.trainable, 'lwir_conv18')
+            lwir_input_data = common.convolutional(lwir_input_data, (3, 3, 160, 320), self.trainable, 'lwir_conv19')
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 320, 160), self.trainable, 'lwir_conv20')
+            lwir_conv_lobj_branch = common.convolutional(lwir_input_data, (3, 3, 160, 320), self.trainable, name='lwir_conv_lobj_branch')
+
+            if self.fusion_method == 'add':
+                size_scale = 1
+                fusion_conv_lobj_branch = conv_lobj_branch + lwir_conv_lobj_branch
+            else:
+                size_scale = 2
+                with tf.variable_scope('fusion_1'):
+                    fusion_conv_lobj_branch = tf.concat([conv_lobj_branch, lwir_conv_lobj_branch], axis=-1)
+
+            conv_lbbox = common.convolutional(fusion_conv_lobj_branch, (1, 1, 320 * size_scale, 3 * (self.num_class + 5)), trainable=self.trainable,
+                                              name='conv_lbbox', activate=False, bn=False)
+
+
+            # for middle object
+            input_data = common.convolutional(input_data, (1, 1, 160, 80), self.trainable, 'conv21')
+            input_data = common.upsample(input_data, name='upsample0', method=self.upsample_method)
+            with tf.variable_scope('route_1'):
+                input_data = tf.concat([input_data, route_2], axis=-1)
+
+            input_data = common.convolutional(input_data, (1, 1, 176, 80), self.trainable, 'conv22')
+            input_data = common.convolutional(input_data, (3, 3, 80, 160), self.trainable, 'conv23')
+            input_data = common.convolutional(input_data, (1, 1, 160, 80), self.trainable, 'conv24')
+            conv_mobj_branch = common.convolutional(input_data, (3, 3, 80, 160), self.trainable, name='conv_mobj_branch')
+
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 160, 80), self.trainable, 'lwir_conv57')
+            lwir_input_data = common.upsample(lwir_input_data, name='lwir_upsample0', method=self.upsample_method)
+            with tf.variable_scope('lwir_route_1'):
+                lwir_input_data = tf.concat([lwir_input_data, lwir_route_2], axis=-1)
+
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 176, 80), self.trainable, 'lwir_conv22')
+            lwir_input_data = common.convolutional(lwir_input_data, (3, 3, 80, 160), self.trainable, 'lwir_conv23')
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 160, 80), self.trainable, 'lwir_conv24')
+            lwir_conv_mobj_branch = common.convolutional(lwir_input_data, (3, 3, 80, 160), self.trainable, name='lwir_conv_mobj_branch')
+
+            if self.fusion_method == 'add':
+                size_scale = 1
+                fusion_conv_mobj_branch = conv_mobj_branch + lwir_conv_mobj_branch
+            else:
+                size_scale = 2
+                with tf.variable_scope('fusion_2'):
+                    fusion_conv_mobj_branch = tf.concat([conv_mobj_branch, lwir_conv_mobj_branch], axis=-1)
+
+            conv_mbbox = common.convolutional(fusion_conv_mobj_branch, (1, 1, 160 * size_scale, 3 * (self.num_class + 5)), trainable=self.trainable,
+                                              name='conv_mbbox', activate=False, bn=False)
+
+
+            # for small object
+            input_data = common.convolutional(input_data, (1, 1, 80, 40), self.trainable, 'conv25')
+            input_data = common.upsample(input_data, name='upsample1', method=self.upsample_method)
+            with tf.variable_scope('route_2'):
+                input_data = tf.concat([input_data, route_1], axis=-1)
+
+            input_data = common.convolutional(input_data, (1, 1, 72, 40), self.trainable, 'conv26')
+            input_data = common.convolutional(input_data, (3, 3, 40, 80), self.trainable, 'conv27')
+            input_data = common.convolutional(input_data, (1, 1, 80, 40), self.trainable, 'conv28')
+            conv_sobj_branch = common.convolutional(input_data, (3, 3, 40, 80), self.trainable, name='conv_sobj_branch')
+
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 80, 40), self.trainable, 'lwir_conv25')
+            lwir_input_data = common.upsample(lwir_input_data, name='lwir_upsample1', method=self.upsample_method)
+            with tf.variable_scope('lwir_route_2'):
+                lwir_input_data = tf.concat([lwir_input_data, lwir_route_1], axis=-1)
+
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 72, 40), self.trainable, 'lwir_conv26')
+            lwir_input_data = common.convolutional(lwir_input_data, (3, 3, 40, 80), self.trainable, 'lwir_conv27')
+            lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 80, 40), self.trainable, 'lwir_conv28')
+            lwir_conv_sobj_branch = common.convolutional(lwir_input_data, (3, 3, 40, 80), self.trainable, name='lwir_conv_sobj_branch')
+
+            if self.fusion_method == 'add':
+                size_scale = 1
+                fusion_conv_sobj_branch = conv_sobj_branch + lwir_conv_sobj_branch
+            else:
+                size_scale = 2
+                with tf.variable_scope('fusion_2'):
+                    fusion_conv_sobj_branch = tf.concat([conv_sobj_branch, lwir_conv_sobj_branch], axis=-1)
+
+            conv_sbbox = common.convolutional(fusion_conv_sobj_branch, (1, 1, 80 * size_scale, 3 * (self.num_class + 5)),
+                                              trainable=self.trainable, name='conv_sbbox', activate=False, bn=False)
+            return conv_lbbox, conv_mbbox, conv_sbbox
+
         else:
-            size_scale = 2
-            with tf.variable_scope('fusion_2'):
-                fusion_conv_mobj_branch = tf.concat([conv_mobj_branch, lwir_conv_mobj_branch], axis=-1)
-
-        conv_mbbox = common.convolutional(fusion_conv_mobj_branch, (1, 1, 512 * size_scale, 3 * (self.num_class + 5)), trainable=self.trainable, 
-                                          name='conv_mbbox', activate=False, bn=False)
-
-        
-        # for small object
-        input_data = common.convolutional(input_data, (1, 1, 256, 128), self.trainable, 'conv63')
-        input_data = common.upsample(input_data, name='upsample1', method=self.upsample_method)
-
-        with tf.variable_scope('route_2'):
-            input_data = tf.concat([input_data, route_1], axis=-1)
-
-        input_data = common.convolutional(input_data, (1, 1, 384, 128), self.trainable, 'conv64')
-        input_data = common.convolutional(input_data, (3, 3, 128, 256), self.trainable, 'conv65')
-        input_data = common.convolutional(input_data, (1, 1, 256, 128), self.trainable, 'conv66')
-        input_data = common.convolutional(input_data, (3, 3, 128, 256), self.trainable, 'conv67')
-        input_data = common.convolutional(input_data, (1, 1, 256, 128), self.trainable, 'conv68')
-        conv_sobj_branch = common.convolutional(input_data, (3, 3, 128, 256), self.trainable, name='conv_sobj_branch')
-        
-
-        lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 256, 128), self.trainable, 'lwir_conv63')
-        lwir_input_data = common.upsample(lwir_input_data, name='lwir_upsample1', method=self.upsample_method)
-
-        with tf.variable_scope('lwir_route_2'):
-            lwir_input_data = tf.concat([lwir_input_data, lwir_route_1], axis=-1)
-
-        lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 384, 128), self.trainable, 'lwir_conv64')
-        lwir_input_data = common.convolutional(lwir_input_data, (3, 3, 128, 256), self.trainable, 'lwir_conv65')
-        lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 256, 128), self.trainable, 'lwir_conv66')
-        lwir_input_data = common.convolutional(lwir_input_data, (3, 3, 128, 256), self.trainable, 'lwir_conv67')
-        lwir_input_data = common.convolutional(lwir_input_data, (1, 1, 256, 128), self.trainable, 'lwir_conv68')
-        lwir_conv_sobj_branch = common.convolutional(lwir_input_data, (3, 3, 128, 256), self.trainable, name='lwir_conv_sobj_branch')
-
-        if self.fusion_method == 'add':
-            size_scale = 1
-            fusion_conv_sobj_branch = conv_sobj_branch + lwir_conv_sobj_branch
-        else:
-            size_scale = 2
-            with tf.variable_scope('fusion_2'):
-                fusion_conv_sobj_branch = tf.concat([conv_sobj_branch, lwir_conv_sobj_branch], axis=-1)
-
-        conv_sbbox = common.convolutional(fusion_conv_sobj_branch, (1, 1, 256 * size_scale, 3 * (self.num_class + 5)),
-                                          trainable=self.trainable, name='conv_sbbox', activate=False, bn=False)
-
-        return conv_lbbox, conv_mbbox, conv_sbbox
+            print('self.net_type=%s error' % self.net_type)
 
 
     def decode(self, conv_output, anchors, stride):
@@ -157,8 +260,7 @@ class YOLOV3(object):
         output_size = conv_shape[1]
         anchor_per_scale = len(anchors)
 
-        conv_output = tf.reshape(conv_output, (batch_size, output_size, output_size, 
-                                               anchor_per_scale, 5 + self.num_class))
+        conv_output = tf.reshape(conv_output, (batch_size, output_size, output_size, anchor_per_scale, 5 + self.num_class))
         conv_raw_dxdy = conv_output[:, :, :, :, 0:2]
         conv_raw_dwdh = conv_output[:, :, :, :, 2:4]
         conv_raw_conf = conv_output[:, :, :, :, 4:5]
@@ -172,7 +274,7 @@ class YOLOV3(object):
         xy_grid = tf.cast(xy_grid, tf.float32)
 
         pred_xy = (tf.sigmoid(conv_raw_dxdy) + xy_grid) * stride
-        pred_wh = (tf.exp(conv_raw_dwdh) * anchors) * stride
+        pred_wh = tf.exp(conv_raw_dwdh) * anchors * stride
         pred_xywh = tf.concat([pred_xy, pred_wh], axis=-1)
 
         pred_conf = tf.sigmoid(conv_raw_conf)
@@ -186,15 +288,11 @@ class YOLOV3(object):
 
 
     def bbox_giou(self, boxes1, boxes2):
-        boxes1 = tf.concat([boxes1[..., :2] - boxes1[..., 2:] * 0.5,
-                            boxes1[..., :2] + boxes1[..., 2:] * 0.5], axis=-1)
-        boxes2 = tf.concat([boxes2[..., :2] - boxes2[..., 2:] * 0.5,
-                            boxes2[..., :2] + boxes2[..., 2:] * 0.5], axis=-1)
+        boxes1 = tf.concat([boxes1[..., :2] - boxes1[..., 2:] * 0.5, boxes1[..., :2] + boxes1[..., 2:] * 0.5], axis=-1)
+        boxes2 = tf.concat([boxes2[..., :2] - boxes2[..., 2:] * 0.5, boxes2[..., :2] + boxes2[..., 2:] * 0.5], axis=-1)
 
-        boxes1 = tf.concat([tf.minimum(boxes1[..., :2], boxes1[..., 2:]),
-                            tf.maximum(boxes1[..., :2], boxes1[..., 2:])], axis=-1)
-        boxes2 = tf.concat([tf.minimum(boxes2[..., :2], boxes2[..., 2:]),
-                            tf.maximum(boxes2[..., :2], boxes2[..., 2:])], axis=-1)
+        boxes1 = tf.concat([tf.minimum(boxes1[..., :2], boxes1[..., 2:]), tf.maximum(boxes1[..., :2], boxes1[..., 2:])], axis=-1)
+        boxes2 = tf.concat([tf.minimum(boxes2[..., :2], boxes2[..., 2:]), tf.maximum(boxes2[..., :2], boxes2[..., 2:])], axis=-1)
 
         boxes1_area = (boxes1[..., 2] - boxes1[..., 0]) * (boxes1[..., 3] - boxes1[..., 1])
         boxes2_area = (boxes2[..., 2] - boxes2[..., 0]) * (boxes2[..., 3] - boxes2[..., 1])
@@ -220,10 +318,8 @@ class YOLOV3(object):
         boxes1_area = boxes1[..., 2] * boxes1[..., 3]
         boxes2_area = boxes2[..., 2] * boxes2[..., 3]
 
-        boxes1 = tf.concat([boxes1[..., :2] - boxes1[..., 2:] * 0.5,
-                            boxes1[..., :2] + boxes1[..., 2:] * 0.5], axis=-1)
-        boxes2 = tf.concat([boxes2[..., :2] - boxes2[..., 2:] * 0.5,
-                            boxes2[..., :2] + boxes2[..., 2:] * 0.5], axis=-1)
+        boxes1 = tf.concat([boxes1[..., :2] - boxes1[..., 2:] * 0.5, boxes1[..., :2] + boxes1[..., 2:] * 0.5], axis=-1)
+        boxes2 = tf.concat([boxes2[..., :2] - boxes2[..., 2:] * 0.5, boxes2[..., :2] + boxes2[..., 2:] * 0.5], axis=-1)
 
         left_up = tf.maximum(boxes1[..., :2], boxes2[..., :2])
         right_down = tf.minimum(boxes1[..., 2:], boxes2[..., 2:])
@@ -242,8 +338,7 @@ class YOLOV3(object):
         output_size = conv_shape[1]
         input_size = stride * output_size
 
-        conv = tf.reshape(conv, (batch_size, output_size, output_size,
-                                 self.anchor_per_scale, 5 + self.num_class))
+        conv = tf.reshape(conv, (batch_size, output_size, output_size, self.anchor_per_scale, 5 + self.num_class))
         conv_raw_conf = conv[:, :, :, :, 4:5]
         conv_raw_prob = conv[:, :, :, :, 5:]
 
